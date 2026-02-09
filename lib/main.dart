@@ -351,53 +351,57 @@ class _WebViewScreenState extends State<WebViewScreen> {
               minHeight: 3,
             ),
           Expanded(
-            child: InAppWebView(
-              initialUrlRequest: URLRequest(
-                url: WebUri('https://www.jenta.pro'),
-                headers: {
-                  'Referer': 'https://www.jenta.pro/',
-                  'Origin': 'https://www.jenta.pro',
-                },
-              ),
-              initialSettings: InAppWebViewSettings(
-                javaScriptEnabled: true,
-                useShouldOverrideUrlLoading: true,
-                mediaPlaybackRequiresUserGesture: false,
-                allowsInlineMediaPlayback: true,
-                // Allow cross-origin requests
-                javaScriptCanOpenWindowsAutomatically: true,
-                supportMultipleWindows: false,
-                allowUniversalAccessFromFileURLs: true,
-                allowFileAccessFromFileURLs: true,
-                // Disable web security for cross-origin API calls
-                disableDefaultErrorPage: true,
-                // Use a standard Chrome user agent
-                userAgent:
-                    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-              ),
-              onWebViewCreated: (controller) {
-                _webViewController = controller;
-              },
-              onProgressChanged: (controller, progress) {
-                setState(() {
-                  _progress = progress / 100;
-                });
-              },
-              shouldOverrideUrlLoading: (controller, navigationAction) async {
-                return NavigationActionPolicy.ALLOW;
-              },
-              onReceivedServerTrustAuthRequest: (controller, challenge) async {
-                return ServerTrustAuthResponse(
-                  action: ServerTrustAuthResponseAction.PROCEED,
-                );
-              },
-              onLoadStop: (controller, url) async {
-                setState(() {
-                  _progress = 1.0;
-                });
-                // Override fetch to add proper headers for API calls
-                await controller.evaluateJavascript(
-                  source: '''
+            child: Stack(
+              children: [
+                InAppWebView(
+                  initialUrlRequest: URLRequest(
+                    url: WebUri('https://www.jenta.pro'),
+                    headers: {
+                      'Referer': 'https://www.jenta.pro/',
+                      'Origin': 'https://www.jenta.pro',
+                    },
+                  ),
+                  initialSettings: InAppWebViewSettings(
+                    javaScriptEnabled: true,
+                    useShouldOverrideUrlLoading: true,
+                    mediaPlaybackRequiresUserGesture: false,
+                    allowsInlineMediaPlayback: true,
+                    // Allow cross-origin requests
+                    javaScriptCanOpenWindowsAutomatically: true,
+                    supportMultipleWindows: false,
+                    allowUniversalAccessFromFileURLs: true,
+                    allowFileAccessFromFileURLs: true,
+                    // Disable web security for cross-origin API calls
+                    disableDefaultErrorPage: true,
+                    // Use a standard Chrome user agent
+                    userAgent:
+                        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+                  ),
+                  onWebViewCreated: (controller) {
+                    _webViewController = controller;
+                  },
+                  onProgressChanged: (controller, progress) {
+                    setState(() {
+                      _progress = progress / 100;
+                    });
+                  },
+                  shouldOverrideUrlLoading:
+                      (controller, navigationAction) async {
+                        return NavigationActionPolicy.ALLOW;
+                      },
+                  onReceivedServerTrustAuthRequest:
+                      (controller, challenge) async {
+                        return ServerTrustAuthResponse(
+                          action: ServerTrustAuthResponseAction.PROCEED,
+                        );
+                      },
+                  onLoadStop: (controller, url) async {
+                    setState(() {
+                      _progress = 1.0;
+                    });
+                    // Override fetch to add proper headers for API calls
+                    await controller.evaluateJavascript(
+                      source: '''
                   (function() {
                     // Override fetch to add headers
                     const originalFetch = window.fetch;
@@ -423,7 +427,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
                       return originalFetch.call(this, url, options);
                     };
                     
-                    // Hide header/navbar elements
+                    // Hide header/navbar elements (CSS)
                     var selectors = [
                       'header',
                       'nav',
@@ -441,21 +445,41 @@ class _WebViewScreenState extends State<WebViewScreen> {
                     });
                   })();
                 ''',
-                );
-              },
-              onReceivedError: (controller, request, error) {
-                debugPrint(
-                  'WebView error: ${error.type} - ${error.description}',
-                );
-              },
-              onReceivedHttpError: (controller, request, response) {
-                debugPrint(
-                  'HTTP error: ${response.statusCode} - ${response.reasonPhrase}',
-                );
-              },
-              onConsoleMessage: (controller, consoleMessage) {
-                debugPrint('Console: ${consoleMessage.message}');
-              },
+                    );
+                  },
+                  onReceivedError: (controller, request, error) {
+                    debugPrint(
+                      'WebView error: ${error.type} - ${error.description}',
+                    );
+                  },
+                  onReceivedHttpError: (controller, request, response) {
+                    debugPrint(
+                      'HTTP error: ${response.statusCode} - ${response.reasonPhrase}',
+                    );
+                  },
+                  onConsoleMessage: (controller, consoleMessage) {
+                    debugPrint('Console: ${consoleMessage.message}');
+                  },
+                ),
+                // Overlay to cover the website header
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  height:
+                      25, // Adjust height as needed to cover the website header
+                  child: Container(
+                    color: const Color(
+                      0xFF0D0D0D,
+                    ), // Match your app/website background color
+                    alignment: Alignment.center,
+                    child: const Text(
+                      '', // You can put a title here if you want
+                      style: TextStyle(color: Colors.white, fontSize: 18),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ],
