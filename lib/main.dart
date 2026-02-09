@@ -339,39 +339,6 @@ class _WebViewScreenState extends State<WebViewScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          'Jenta',
-          style: TextStyle(fontWeight: FontWeight.w600),
-        ),
-        backgroundColor: const Color(0xFF6C63FF),
-        foregroundColor: Colors.white,
-        elevation: 0,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.arrow_back_rounded),
-            onPressed: () async {
-              if (_webViewController != null &&
-                  await _webViewController!.canGoBack()) {
-                _webViewController!.goBack();
-              }
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.arrow_forward_rounded),
-            onPressed: () async {
-              if (_webViewController != null &&
-                  await _webViewController!.canGoForward()) {
-                _webViewController!.goForward();
-              }
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.refresh_rounded),
-            onPressed: () => _webViewController?.reload(),
-          ),
-        ],
-      ),
       body: Column(
         children: [
           if (_progress < 1.0)
@@ -387,14 +354,26 @@ class _WebViewScreenState extends State<WebViewScreen> {
             child: InAppWebView(
               initialUrlRequest: URLRequest(
                 url: WebUri('https://www.jenta.pro'),
+                headers: {
+                  'Referer': 'https://www.jenta.pro/',
+                  'Origin': 'https://www.jenta.pro',
+                },
               ),
               initialSettings: InAppWebViewSettings(
                 javaScriptEnabled: true,
                 useShouldOverrideUrlLoading: true,
                 mediaPlaybackRequiresUserGesture: false,
                 allowsInlineMediaPlayback: true,
+                // Allow cross-origin requests
+                javaScriptCanOpenWindowsAutomatically: true,
+                supportMultipleWindows: false,
+                allowUniversalAccessFromFileURLs: true,
+                allowFileAccessFromFileURLs: true,
+                // Disable web security for cross-origin API calls
+                disableDefaultErrorPage: true,
+                // Use a standard Chrome user agent
                 userAgent:
-                    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
               ),
               onWebViewCreated: (controller) {
                 _webViewController = controller;
@@ -416,6 +395,53 @@ class _WebViewScreenState extends State<WebViewScreen> {
                 setState(() {
                   _progress = 1.0;
                 });
+                // Override fetch to add proper headers for API calls
+                await controller.evaluateJavascript(
+                  source: '''
+                  (function() {
+                    // Override fetch to add headers
+                    const originalFetch = window.fetch;
+                    window.fetch = function(url, options) {
+                      options = options || {};
+                      options.headers = options.headers || {};
+                      
+                      // Convert Headers object to plain object if needed
+                      if (options.headers instanceof Headers) {
+                        const headerObj = {};
+                        options.headers.forEach((value, key) => {
+                          headerObj[key] = value;
+                        });
+                        options.headers = headerObj;
+                      }
+                      
+                      // Add origin-related headers for Gemini API
+                      if (url && url.toString().includes('generativelanguage.googleapis.com')) {
+                        options.mode = 'cors';
+                        options.credentials = 'omit';
+                      }
+                      
+                      return originalFetch.call(this, url, options);
+                    };
+                    
+                    // Hide header/navbar elements
+                    var selectors = [
+                      'header',
+                      'nav',
+                      '.navbar',
+                      '.header',
+                      '[class*="navbar"]',
+                      '[class*="header"]',
+                      '[class*="nav-bar"]'
+                    ];
+                    selectors.forEach(function(sel) {
+                      var elements = document.querySelectorAll(sel);
+                      elements.forEach(function(el) {
+                        el.style.display = 'none';
+                      });
+                    });
+                  })();
+                ''',
+                );
               },
               onReceivedError: (controller, request, error) {
                 debugPrint(
