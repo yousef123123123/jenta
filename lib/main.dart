@@ -77,8 +77,8 @@ class AuthScreen extends StatefulWidget {
 class _AuthScreenState extends State<AuthScreen>
     with SingleTickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
-  final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
+  final _emailController = TextEditingController(text: 'test@test.com');
+  final _passwordController = TextEditingController(text: 'test@test.com');
   bool _isLoading = false;
   bool _obscurePassword = true;
   late AnimationController _animationController;
@@ -164,7 +164,11 @@ class _AuthScreenState extends State<AuthScreen>
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [Color(0xFF6C63FF), Color(0xFF4A42E8), Color(0xFF3730A3)],
+            colors: [
+              Color.fromARGB(255, 255, 4, 4),
+              Color.fromARGB(255, 187, 126, 126),
+              Color.fromARGB(255, 255, 4, 62),
+            ],
           ),
         ),
         child: SafeArea(
@@ -201,21 +205,18 @@ class _AuthScreenState extends State<AuthScreen>
                               gradient: const LinearGradient(
                                 begin: Alignment.topLeft,
                                 end: Alignment.bottomRight,
-                                colors: [Color(0xFF6C63FF), Color(0xFF4A42E8)],
+                                colors: [
+                                  Color.fromARGB(255, 188, 186, 236),
+                                  Color.fromARGB(255, 255, 255, 255),
+                                ],
                               ),
                               borderRadius: BorderRadius.circular(20),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: const Color(0xFF6C63FF).withAlpha(102),
-                                  blurRadius: 20,
-                                  offset: const Offset(0, 8),
-                                ),
-                              ],
+                              boxShadow: [],
                             ),
-                            child: const Icon(
-                              Icons.lock_outline_rounded,
-                              size: 40,
-                              color: Colors.white,
+                            child: Image.asset(
+                              "assets/icon.png",
+                              width: 60,
+                              height: 60,
                             ),
                           ),
                           const SizedBox(height: 24),
@@ -373,9 +374,10 @@ class _WebViewScreenState extends State<WebViewScreen> {
                     allowFileAccessFromFileURLs: true,
                     // Disable web security for cross-origin API calls
                     disableDefaultErrorPage: true,
-                    // Use a standard Chrome user agent
-                    userAgent:
-                        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+                    // Use a standard Chrome user agent based on platform
+                    userAgent: defaultTargetPlatform == TargetPlatform.macOS
+                        ? 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
+                        : 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
                   ),
                   onWebViewCreated: (controller) {
                     _webViewController = controller;

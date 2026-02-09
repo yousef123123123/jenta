@@ -54,5 +54,9 @@
 	</dict>
 	<key>io.flutter.embedded_views_preview</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>This app needs access to the camera for AI vision features.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>This app needs access to the microphone for AI voice features.</string>
 </dict>
 </plist>
