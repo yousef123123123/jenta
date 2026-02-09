@@ -393,7 +393,8 @@ class _WebViewScreenState extends State<WebViewScreen> {
                 useShouldOverrideUrlLoading: true,
                 mediaPlaybackRequiresUserGesture: false,
                 allowsInlineMediaPlayback: true,
-                transparentBackground: true,
+                userAgent:
+                    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
               ),
               onWebViewCreated: (controller) {
                 _webViewController = controller;
@@ -416,8 +417,18 @@ class _WebViewScreenState extends State<WebViewScreen> {
                   _progress = 1.0;
                 });
               },
-              onLoadError: (controller, url, code, message) {
-                debugPrint('Load error: $code - $message');
+              onReceivedError: (controller, request, error) {
+                debugPrint(
+                  'WebView error: ${error.type} - ${error.description}',
+                );
+              },
+              onReceivedHttpError: (controller, request, response) {
+                debugPrint(
+                  'HTTP error: ${response.statusCode} - ${response.reasonPhrase}',
+                );
+              },
+              onConsoleMessage: (controller, consoleMessage) {
+                debugPrint('Console: ${consoleMessage.message}');
               },
             ),
           ),
