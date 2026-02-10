@@ -43,6 +43,7 @@ dev_dependencies:
   flutter_lints: ^6.0.0
   flutter_test:
     sdk: flutter
+  msix: ^3.16.1
 
 flutter_launcher_icons:
   android: "launcher_icon"
@@ -53,6 +54,15 @@ flutter_launcher_icons:
     generate: true
     image_path: "assets/icon.png"
     icon_size: 48
+
+msix_config:
+  display_name: Jenta
+  publisher_display_name: Your Company Name
+  publisher: CN=YourCommonName, O=YourOrganization, L=YourCity, S=YourState, C=YourCountry
+  identity_name: com.example.jenta
+  msix_version: 1.0.0.0
+  logo_path: assets/icon.png
+  capabilities: internetClient, location, microphone, webcam
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

@@ -22,14 +22,22 @@ jobs:
       - name: Get dependencies
         run: flutter pub get
       
-      - name: Build Windows
-        run: flutter build windows --release
+      - name: Build Windows (MSIX)
+        run: |
+          flutter build windows --release
+          flutter pub run msix:create --certificate-base64 ${{ secrets.WINDOWS_PFX_BASE64 }} --certificate-password ${{ secrets.WINDOWS_PFX_PASSWORD }} --publisher "${{ secrets.WINDOWS_PUBLISHER_CN }}"
       
-      - name: Upload Windows Artifact
+      - name: Create Windows ZIP
+        run: |
+          powershell Compress-Archive -Path build/windows/x64/runner/Release/* -DestinationPath build/windows/x64/runner/Release/jenta-windows.zip
+      
+      - name: Upload Windows Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: windows-release
-          path: build/windows/x64/runner/Release/
+          path: |
+            build/windows/x64/runner/Release/*.msix
+            build/windows/x64/runner/Release/jenta-windows.zip
 
   build-macos:
     runs-on: macos-latest
