@@ -3,6 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:flutter_inappwebview_macos/flutter_inappwebview_macos.dart';
 import 'package:flutter_inappwebview_windows/flutter_inappwebview_windows.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+import 'services/auth_service.dart';
+import 'services/device_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -12,6 +16,12 @@ void main() async {
   } else if (!kIsWeb && defaultTargetPlatform == TargetPlatform.windows) {
     WindowsInAppWebViewPlatform.registerWith();
   }
+
+  // Supabase configuration
+  await Supabase.initialize(
+    url: 'https://egilsbngmqlbdcgxqrdg.supabase.co',
+    anonKey: 'sb_publishable_ogIpM4nfJ0DnYkzHpJm7pA_TpHze361',
+  );
 
   runApp(const MyApp());
 }
@@ -67,6 +77,10 @@ class MyApp extends StatelessWidget {
   }
 }
 
+// ─────────────────────────────────────────────
+// LICENSE KEY AUTH SCREEN
+// ─────────────────────────────────────────────
+
 class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key});
 
@@ -77,10 +91,8 @@ class AuthScreen extends StatefulWidget {
 class _AuthScreenState extends State<AuthScreen>
     with SingleTickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
-  final _emailController = TextEditingController(text: 'test@test.com');
-  final _passwordController = TextEditingController(text: 'test@test.com');
+  final _licenseKeyController = TextEditingController();
   bool _isLoading = false;
-  bool _obscurePassword = true;
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
@@ -110,48 +122,61 @@ class _AuthScreenState extends State<AuthScreen>
 
   @override
   void dispose() {
-    _emailController.dispose();
-    _passwordController.dispose();
+    _licenseKeyController.dispose();
     _animationController.dispose();
     super.dispose();
   }
 
-  void _login() async {
+  void _activate() async {
     if (_formKey.currentState!.validate()) {
       setState(() => _isLoading = true);
 
-      await Future.delayed(const Duration(milliseconds: 1500));
+      final deviceId = await DeviceService.getDeviceId();
+      debugPrint('Device ID: $deviceId');
 
-      final email = _emailController.text.trim();
-      final password = _passwordController.text;
+      final authResponse = await AuthService.validateLicenseKey(
+        licenseKey: _licenseKeyController.text.trim(),
+        deviceId: deviceId,
+      );
 
-      if (email == 'test@test.com' && password == 'test@test.com') {
-        if (mounted) {
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (_) => const WebViewScreen()),
-          );
-        }
+      if (!mounted) return;
+
+      if (authResponse.result == AuthResult.success) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (_) =>
+                WebViewScreen(licenseData: authResponse.licenseData!),
+          ),
+        );
       } else {
-        if (mounted) {
-          setState(() => _isLoading = false);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Row(
-                children: [
-                  Icon(Icons.error_outline, color: Colors.white),
-                  SizedBox(width: 12),
-                  Text('Invalid email or password'),
-                ],
-              ),
-              backgroundColor: Colors.red.shade600,
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              margin: const EdgeInsets.all(16),
+        setState(() => _isLoading = false);
+
+        final message = AuthService.getErrorMessage(authResponse.result);
+        final isDeviceError = authResponse.result == AuthResult.wrongDevice;
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                Icon(
+                  isDeviceError ? Icons.devices_other : Icons.error_outline,
+                  color: Colors.white,
+                ),
+                const SizedBox(width: 12),
+                Expanded(child: Text(message)),
+              ],
             ),
-          );
-        }
+            backgroundColor: isDeviceError
+                ? Colors.orange.shade700
+                : Colors.red.shade600,
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 5),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            margin: const EdgeInsets.all(16),
+          ),
+        );
       }
     }
   }
@@ -211,7 +236,6 @@ class _AuthScreenState extends State<AuthScreen>
                                 ],
                               ),
                               borderRadius: BorderRadius.circular(20),
-                              boxShadow: [],
                             ),
                             child: Image.asset(
                               "assets/icon.png",
@@ -221,7 +245,7 @@ class _AuthScreenState extends State<AuthScreen>
                           ),
                           const SizedBox(height: 24),
                           const Text(
-                            'Welcome Back',
+                            'Activate Jenta',
                             style: TextStyle(
                               fontSize: 28,
                               fontWeight: FontWeight.bold,
@@ -230,7 +254,7 @@ class _AuthScreenState extends State<AuthScreen>
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            'Sign in to continue',
+                            'Enter your license key to continue',
                             style: TextStyle(
                               fontSize: 16,
                               color: Colors.grey.shade600,
@@ -238,50 +262,26 @@ class _AuthScreenState extends State<AuthScreen>
                           ),
                           const SizedBox(height: 32),
                           TextFormField(
-                            controller: _emailController,
-                            keyboardType: TextInputType.emailAddress,
+                            controller: _licenseKeyController,
+                            textCapitalization: TextCapitalization.characters,
+                            style: const TextStyle(
+                              fontFamily: 'monospace',
+                              fontSize: 16,
+                              letterSpacing: 2,
+                            ),
                             decoration: const InputDecoration(
-                              hintText: 'Email address',
+                              hintText: 'XXXX-XXXX-XXXX-XXXX',
                               prefixIcon: Icon(
-                                Icons.email_outlined,
+                                Icons.vpn_key_outlined,
                                 color: Color(0xFF6C63FF),
                               ),
                             ),
                             validator: (value) {
-                              if (value == null || value.isEmpty) {
-                                return 'Please enter your email';
+                              if (value == null || value.trim().isEmpty) {
+                                return 'Please enter your license key';
                               }
-                              if (!value.contains('@')) {
-                                return 'Please enter a valid email';
-                              }
-                              return null;
-                            },
-                          ),
-                          const SizedBox(height: 16),
-                          TextFormField(
-                            controller: _passwordController,
-                            obscureText: _obscurePassword,
-                            decoration: InputDecoration(
-                              hintText: 'Password',
-                              prefixIcon: const Icon(
-                                Icons.lock_outline,
-                                color: Color(0xFF6C63FF),
-                              ),
-                              suffixIcon: IconButton(
-                                icon: Icon(
-                                  _obscurePassword
-                                      ? Icons.visibility_off_outlined
-                                      : Icons.visibility_outlined,
-                                  color: Colors.grey.shade600,
-                                ),
-                                onPressed: () => setState(
-                                  () => _obscurePassword = !_obscurePassword,
-                                ),
-                              ),
-                            ),
-                            validator: (value) {
-                              if (value == null || value.isEmpty) {
-                                return 'Please enter your password';
+                              if (value.trim().length < 8) {
+                                return 'License key is too short';
                               }
                               return null;
                             },
@@ -290,7 +290,7 @@ class _AuthScreenState extends State<AuthScreen>
                           SizedBox(
                             width: double.infinity,
                             child: ElevatedButton(
-                              onPressed: _isLoading ? null : _login,
+                              onPressed: _isLoading ? null : _activate,
                               child: _isLoading
                                   ? const SizedBox(
                                       height: 24,
@@ -303,14 +303,41 @@ class _AuthScreenState extends State<AuthScreen>
                                             ),
                                       ),
                                     )
-                                  : const Text(
-                                      'Sign In',
-                                      style: TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.w600,
-                                      ),
+                                  : const Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        Icon(Icons.lock_open, size: 20),
+                                        SizedBox(width: 8),
+                                        Text(
+                                          'Activate',
+                                          style: TextStyle(
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ],
                                     ),
                             ),
+                          ),
+                          const SizedBox(height: 16),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.info_outline,
+                                size: 14,
+                                color: Colors.grey.shade500,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                'Key is bound to this device only',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey.shade500,
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
@@ -326,20 +353,140 @@ class _AuthScreenState extends State<AuthScreen>
   }
 }
 
+// ─────────────────────────────────────────────
+// WEBVIEW SCREEN WITH PROFILE
+// ─────────────────────────────────────────────
+
 class WebViewScreen extends StatefulWidget {
-  const WebViewScreen({super.key});
+  final LicenseData licenseData;
+
+  const WebViewScreen({super.key, required this.licenseData});
 
   @override
   State<WebViewScreen> createState() => _WebViewScreenState();
 }
 
 class _WebViewScreenState extends State<WebViewScreen> {
-  InAppWebViewController? _webViewController;
   double _progress = 0;
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+
+  void _signOut() {
+    Navigator.of(
+      context,
+    ).pushReplacement(MaterialPageRoute(builder: (_) => const AuthScreen()));
+  }
+
+  String _formatDate(DateTime date) {
+    return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+  }
 
   @override
   Widget build(BuildContext context) {
+    final license = widget.licenseData;
+    final daysLeft = license.expiresAt.difference(DateTime.now()).inDays;
+
     return Scaffold(
+      key: _scaffoldKey,
+
+      // ── Profile Drawer ──
+      endDrawer: Drawer(
+        child: SafeArea(
+          child: Column(
+            children: [
+              const SizedBox(height: 20),
+
+              // Avatar
+              CircleAvatar(
+                radius: 40,
+                backgroundColor: const Color(0xFF6C63FF),
+                child: Text(
+                  license.name.isNotEmpty ? license.name[0].toUpperCase() : 'U',
+                  style: const TextStyle(
+                    fontSize: 32,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Name
+              Text(
+                license.name,
+                style: const TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 24),
+
+              // License Info
+              Container(
+                margin: const EdgeInsets.symmetric(horizontal: 16),
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Column(
+                  children: [
+                    _infoRow(Icons.vpn_key, 'License Key', license.licenseKey),
+                    const Divider(height: 24),
+                    _infoRow(
+                      Icons.timer,
+                      'Duration',
+                      '${license.durationMonths} month${license.durationMonths != 1 ? 's' : ''}',
+                    ),
+                    const Divider(height: 24),
+                    _infoRow(
+                      Icons.calendar_today,
+                      'Expires',
+                      _formatDate(license.expiresAt),
+                    ),
+                    const Divider(height: 24),
+                    _infoRow(
+                      Icons.hourglass_bottom,
+                      'Days Left',
+                      '$daysLeft day${daysLeft != 1 ? 's' : ''}',
+                    ),
+                  ],
+                ),
+              ),
+
+              const Spacer(),
+
+              // Sign Out Button
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: _signOut,
+                    icon: const Icon(Icons.logout),
+                    label: const Text(
+                      'Sign Out',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.red.shade600,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
+          ),
+        ),
+      ),
+
       body: Column(
         children: [
           if (_progress < 1.0)
@@ -367,21 +514,16 @@ class _WebViewScreenState extends State<WebViewScreen> {
                     useShouldOverrideUrlLoading: true,
                     mediaPlaybackRequiresUserGesture: false,
                     allowsInlineMediaPlayback: true,
-                    // Allow cross-origin requests
                     javaScriptCanOpenWindowsAutomatically: true,
                     supportMultipleWindows: false,
                     allowUniversalAccessFromFileURLs: true,
                     allowFileAccessFromFileURLs: true,
-                    // Disable web security for cross-origin API calls
                     disableDefaultErrorPage: true,
-                    // Use a standard Chrome user agent based on platform
                     userAgent: defaultTargetPlatform == TargetPlatform.macOS
                         ? 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
                         : 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
                   ),
-                  onWebViewCreated: (controller) {
-                    _webViewController = controller;
-                  },
+                  onWebViewCreated: (controller) {},
                   onProgressChanged: (controller, progress) {
                     setState(() {
                       _progress = progress / 100;
@@ -401,17 +543,22 @@ class _WebViewScreenState extends State<WebViewScreen> {
                     setState(() {
                       _progress = 1.0;
                     });
-                    // Override fetch to add proper headers for API calls
                     await controller.evaluateJavascript(
                       source: '''
                   (function() {
-                    // Override fetch to add headers
+                    // ── Intercept fetch() calls ──
                     const originalFetch = window.fetch;
                     window.fetch = function(url, options) {
                       options = options || {};
-                      options.headers = options.headers || {};
+                      const method = (options.method || 'GET').toUpperCase();
+                      console.log('[API →] ' + method + ' ' + url);
+                      if (options.body) {
+                        try {
+                          console.log('[API → BODY] ' + (typeof options.body === 'string' ? options.body.substring(0, 500) : JSON.stringify(options.body).substring(0, 500)));
+                        } catch(e) {}
+                      }
                       
-                      // Convert Headers object to plain object if needed
+                      options.headers = options.headers || {};
                       if (options.headers instanceof Headers) {
                         const headerObj = {};
                         options.headers.forEach((value, key) => {
@@ -420,16 +567,58 @@ class _WebViewScreenState extends State<WebViewScreen> {
                         options.headers = headerObj;
                       }
                       
-                      // Add origin-related headers for Gemini API
                       if (url && url.toString().includes('generativelanguage.googleapis.com')) {
                         options.mode = 'cors';
                         options.credentials = 'omit';
                       }
                       
-                      return originalFetch.call(this, url, options);
+                      return originalFetch.call(this, url, options).then(function(response) {
+                        console.log('[API ←] ' + response.status + ' ' + method + ' ' + url);
+                        // Clone to read body without consuming the stream
+                        const cloned = response.clone();
+                        cloned.text().then(function(body) {
+                          console.log('[API ← BODY] ' + url.toString().split('?')[0] + ' → ' + body.substring(0, 300));
+                        }).catch(function() {});
+                        return response;
+                      }).catch(function(err) {
+                        console.log('[API ✗] FAILED ' + method + ' ' + url + ' → ' + err.message);
+                        throw err;
+                      });
+                    };
+
+                    // ── Intercept XMLHttpRequest calls ──
+                    const originalXHROpen = XMLHttpRequest.prototype.open;
+                    const originalXHRSend = XMLHttpRequest.prototype.send;
+                    
+                    XMLHttpRequest.prototype.open = function(method, url) {
+                      this._apiMethod = method;
+                      this._apiUrl = url;
+                      return originalXHROpen.apply(this, arguments);
                     };
                     
-                    // Hide header/navbar elements (CSS)
+                    XMLHttpRequest.prototype.send = function(body) {
+                      console.log('[XHR →] ' + (this._apiMethod || 'GET').toUpperCase() + ' ' + this._apiUrl);
+                      if (body) {
+                        try {
+                          console.log('[XHR → BODY] ' + (typeof body === 'string' ? body.substring(0, 500) : '(binary)'));
+                        } catch(e) {}
+                      }
+                      
+                      this.addEventListener('load', function() {
+                        console.log('[XHR ←] ' + this.status + ' ' + (this._apiMethod || 'GET').toUpperCase() + ' ' + this._apiUrl);
+                        try {
+                          console.log('[XHR ← BODY] ' + (this.responseText || '').substring(0, 300));
+                        } catch(e) {}
+                      });
+                      
+                      this.addEventListener('error', function() {
+                        console.log('[XHR ✗] FAILED ' + (this._apiMethod || 'GET').toUpperCase() + ' ' + this._apiUrl);
+                      });
+                      
+                      return originalXHRSend.apply(this, arguments);
+                    };
+                    
+                    // ── Hide header/navbar elements ──
                     var selectors = [
                       'header',
                       'nav',
@@ -445,6 +634,8 @@ class _WebViewScreenState extends State<WebViewScreen> {
                         el.style.display = 'none';
                       });
                     });
+                    
+                    console.log('[API Monitor] Active - all fetch/XHR calls will be logged');
                   })();
                 ''',
                     );
@@ -463,21 +654,23 @@ class _WebViewScreenState extends State<WebViewScreen> {
                     debugPrint('Console: ${consoleMessage.message}');
                   },
                 ),
-                // Overlay to cover the website header
+                // Overlay header bar with profile button
                 Positioned(
                   top: 0,
                   left: 0,
                   right: 0,
-                  height:
-                      25, // Adjust height as needed to cover the website header
+                  height: 25,
                   child: Container(
-                    color: const Color(
-                      0xFF0D0D0D,
-                    ), // Match your app/website background color
-                    alignment: Alignment.center,
-                    child: const Text(
-                      '', // You can put a title here if you want
-                      style: TextStyle(color: Colors.white, fontSize: 18),
+                    color: const Color(0xFF0D0D0D),
+                    alignment: Alignment.centerRight,
+                    padding: const EdgeInsets.only(right: 4),
+                    child: GestureDetector(
+                      onTap: () => _scaffoldKey.currentState?.openEndDrawer(),
+                      child: const Icon(
+                        Icons.account_circle,
+                        color: Colors.white70,
+                        size: 20,
+                      ),
                     ),
                   ),
                 ),
@@ -486,6 +679,29 @@ class _WebViewScreenState extends State<WebViewScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _infoRow(IconData icon, String label, String value) {
+    return Row(
+      children: [
+        Icon(icon, size: 20, color: const Color(0xFF6C63FF)),
+        const SizedBox(width: 12),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              value,
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }
